@@ -4,11 +4,11 @@ import urllib.parse
 import requests
 from collections import defaultdict
 import time
+import matplotlib.pyplot as plt
 
 API_KEY = st.secrets["api"]["riot_key"]
 SLEEP_INTERVAL = 10
 
-@st.cache_data
 
 def safe_riot_get(url, sleep_interval=SLEEP_INTERVAL):
     while True:
@@ -57,7 +57,8 @@ def get_arena_stats_for_matches(puuid, match_ids):
             if player.get("puuid") == puuid:
                 arena_data.append({
                     "champion": player.get("championName"),
-                    "placement": player.get("placement")
+                    "placement": player.get("placement"),
+                    "match_id": match_id
                 })
                 break
         time.sleep(0.1)
@@ -95,7 +96,8 @@ def analyze_arena_data(arena_data, all_champions):
 
 
 # --- Streamlit UI ---
-st.title("LoL Arena Champion Stats Viewer")
+st.set_page_config(page_title="LoL Arena Tracker", layout="wide")
+st.title("📊 LoL Arena Champion Tracker")
 
 riot_id = st.text_input("Enter your Riot ID (e.g. 탑입니다#원거리)")
 
@@ -109,11 +111,47 @@ if riot_id and "#" in riot_id:
             all_champions = get_all_champions()
             summary_df = analyze_arena_data(arena_results, all_champions)
 
-            st.success(f"Found {len(match_ids)} Arena matches!")
-            st.dataframe(summary_df, use_container_width=True)
+            # 🔢 Compute overall stats
+            all_placements = [record["placement"] for record in arena_results]
+            total_games = len(all_placements)
+            rank1_count = all_placements.count(1)
+            top4_count = sum(1 for p in all_placements if p <= 4)
+            avg_placement = round(sum(all_placements) / total_games, 2) if total_games else "-"
+            rank1_rate = f"{(rank1_count / total_games * 100):.2f}%" if total_games else "-"
+            top4_rate = f"{(top4_count / total_games * 100):.2f}%" if total_games else "-"
 
-            csv = summary_df.to_csv(index=False).encode('utf-8')
+            # 📊 Show overall stats
+            st.markdown("### 🧾 Overall Stats")
+            st.markdown(f"- **Total games played:** {total_games}")
+            st.markdown(f"- **Average placement (all games):** {avg_placement}")
+            st.markdown(f"- **1st-place rate:** {rank1_rate}")
+            st.markdown(f"- **Top-4 rate:** {top4_rate}")
+
+            # 📈 Chart: placement over time
+            st.markdown("### 📉 Placement Over Time")
+            placement_df = pd.DataFrame({
+                "match_index": list(range(1, total_games + 1)),
+                "placement": all_placements
+            })
+            st.line_chart(placement_df.set_index("match_index"))
+
+            # 📋 Champion Summary Table
+            st.markdown("### 🧠 Champion Performance Summary")
+
+            summary_df["average_placement_numeric"] = pd.to_numeric(summary_df["average_placement"], errors="coerce")
+            sort_order = st.selectbox("Sort champions by average placement:", ["Lowest first", "Highest first"])
+            ascending = (sort_order == "Lowest first")
+            sorted_df = summary_df.sort_values(by="average_placement_numeric", ascending=ascending)
+
+            st.dataframe(
+                sorted_df.drop(columns=["average_placement_numeric"]),
+                use_container_width=True
+            )
+
+            # 📁 Downloadable CSV
+            csv = sorted_df.drop(columns=["average_placement_numeric"]).to_csv(index=False).encode('utf-8')
             st.download_button("Download as CSV", csv, "arena_champion_summary.csv", "text/csv")
+
         else:
             st.error("Could not fetch PUUID. Check your Riot ID.")
 elif riot_id:
