@@ -5,7 +5,7 @@ import requests
 from collections import defaultdict
 import time
 
-API_KEY = "RGAPI-f5f9d629-8e07-4efb-8406-f4ba1eaabd1d"
+API_KEY = st.secrets["api"]["riot_key"]
 SLEEP_INTERVAL = 10
 
 @st.cache_data
