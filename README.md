@@ -24,8 +24,3 @@ cd lol-arena-tracker
 pip install -r requirements.txt
 python lol_arena_tracker.py
 ```
-
----
-
-## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
